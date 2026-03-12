@@ -222,9 +222,11 @@ const getPrizeList = (purchasedLottos, winningLotto) => {
   });
   return prizeList;
 };
-loadComponent("main", "./src/ui/html/main.html").then(() => {
+const BASE_URL = "/javascript-lotto/";
+loadComponent("main", `${BASE_URL}src/ui/html/main.html`).then(() => {
   const modalContainer = document.getElementById("modal-container");
   const modalCloseButton = document.getElementById("modal-close-button");
+  document.querySelector("#modal-close-button img").src = `${BASE_URL}close-button.svg`;
   let purchaseAmount = 0;
   let generatedLottos = [];
   document.querySelector("#purchase-input-section button").addEventListener("click", () => {
