@@ -27,6 +27,11 @@
     fetch(link.href, fetchOpts);
   }
 })();
+const BASE_URL$1 = "/javascript-lotto/";
+const resolvePath = (path) => {
+  if (path.startsWith("./")) return BASE_URL$1 + path.slice(2);
+  return path;
+};
 const loadComponent = (id, path) => {
   return fetch(path).then((response) => response.text()).then((data) => {
     document.getElementById(id).insertAdjacentHTML("beforeend", data);
@@ -36,7 +41,7 @@ const loadComponent = (id, path) => {
 const loadNestedComponents = (root) => {
   const targetComponents = root.querySelectorAll("[data-component]");
   const promises = [...targetComponents].map((element) => {
-    const elementPath = element.dataset.component;
+    const elementPath = resolvePath(element.dataset.component);
     element.removeAttribute("data-component");
     return fetch(elementPath).then((response) => response.text()).then((html) => {
       element.insertAdjacentHTML("beforeend", html);
