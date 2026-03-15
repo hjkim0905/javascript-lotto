@@ -27,16 +27,13 @@
     fetch(link.href, fetchOpts);
   }
 })();
-const BASE_URL$1 = "/javascript-lotto/";
-const resolvePath = (path) => {
-  if (path.startsWith("./")) return BASE_URL$1 + path.slice(2);
-  return path;
-};
+const resolvePath = (path) => new URL(path, document.baseURI).href;
 const loadComponent = (id, path) => {
   return fetch(path).then((response) => response.text()).then((data) => {
-    document.getElementById(id).insertAdjacentHTML("beforeend", data);
-    return loadNestedComponents(document.getElementById(id));
-  });
+    const nodeElement = document.getElementById(id);
+    nodeElement.insertAdjacentHTML("beforeend", data);
+    return loadNestedComponents(nodeElement);
+  }).catch((error) => console.error(`컴포넌트 로드 실패: ${path}`, error));
 };
 const loadNestedComponents = (root) => {
   const targetComponents = root.querySelectorAll("[data-component]");
@@ -46,7 +43,9 @@ const loadNestedComponents = (root) => {
     return fetch(elementPath).then((response) => response.text()).then((html) => {
       element.insertAdjacentHTML("beforeend", html);
       return loadNestedComponents(element);
-    });
+    }).catch(
+      (error) => console.error(`컴포넌트 로드 실패: ${elementPath}`, error)
+    );
   });
   return Promise.all(promises);
 };
@@ -164,8 +163,8 @@ const renderLottoList = (lottos) => {
   section.innerHTML = "";
   lottos.forEach((lotto) => {
     const row = document.createElement("div");
-    row.id = "purchase-lottos";
-    row.innerHTML = `<span id="lotto-icon">🎟️</span><span class="game-container-span">${lotto.getNumbers().join(", ")}</span>`;
+    row.className = "purchase-lottos";
+    row.innerHTML = `<span class="lotto-icon">🎟️</span><span class="game-container-span">${lotto.getNumbers().join(", ")}</span>`;
     section.appendChild(row);
   });
 };
@@ -173,7 +172,9 @@ const renderStatistics = (prizeList, profitRate) => {
   const rows = document.querySelectorAll("#statistics-table tbody tr");
   const order = [5, 4, 3, 2, 1];
   rows.forEach((row, index) => {
-    row.cells[2].textContent = `${prizeList[order[index]]}개`;
+    const rank = order[index];
+    row.cells[1].textContent = PRIZE_PER_RANK[rank].toLocaleString();
+    row.cells[2].textContent = `${prizeList[rank]}개`;
   });
   document.getElementById("profit-div").textContent = `당신의 총 수익률은 ${profitRate}%입니다.`;
 };
@@ -185,8 +186,8 @@ const resetGame = () => {
     element.value = "";
   });
   document.querySelector("#winning-bonus-div input").value = "";
-  document.getElementById("purchase-result-section").style.display = "none";
-  document.getElementById("winning-input-section").style.display = "none";
+  document.getElementById("purchase-result-section").classList.remove("visible-flex");
+  document.getElementById("winning-input-section").classList.remove("visible-flex");
 };
 class WinningLotto extends Lotto {
   #bonusNumber;
@@ -229,15 +230,28 @@ const getPrizeList = (purchasedLottos, winningLotto) => {
   });
   return prizeList;
 };
-const BASE_URL = "/javascript-lotto/";
-loadComponent("main", `${BASE_URL}src/ui/html/main.html`).then(() => {
+const bindPurchaseEvent = (handler) => {
+  document.querySelector("#purchase-input-section").addEventListener("submit", handler);
+};
+const bindResultEvent = (handler) => {
+  document.querySelector("#winning-input-section").addEventListener("submit", handler);
+};
+const bindModalBackdropClick = (handler) => {
+  document.getElementById("modal-container").addEventListener("click", handler);
+};
+const bindModalCloseEvent = (handler) => {
+  document.getElementById("modal-close-button").addEventListener("click", handler);
+};
+const bindResetEvent = (handler) => {
+  document.getElementById("restart-button").addEventListener("click", handler);
+};
+const playLottoGameWeb = () => {
   const modalContainer = document.getElementById("modal-container");
-  const modalCloseButton = document.getElementById("modal-close-button");
-  document.querySelector("#modal-close-button img").src = `${BASE_URL}close-button.svg`;
   let purchaseAmount = 0;
   let generatedLottos = [];
-  document.querySelector("#purchase-input-section button").addEventListener("click", () => {
+  const handlePurchase = (e) => {
     try {
+      e.preventDefault();
       const amount = parseStringToNumber(getPurchaseAmountInput());
       validatePurchaseAmount(amount);
       purchaseAmount = amount;
@@ -247,14 +261,15 @@ loadComponent("main", `${BASE_URL}src/ui/html/main.html`).then(() => {
       );
       renderPurchaseCount(purchaseCount);
       renderLottoList(generatedLottos);
-      document.getElementById("purchase-result-section").style.display = "flex";
-      document.getElementById("winning-input-section").style.display = "flex";
-    } catch (e) {
-      alert(e.message);
+      document.getElementById("purchase-result-section").classList.add("visible-flex");
+      document.getElementById("winning-input-section").classList.add("visible-flex");
+    } catch (e2) {
+      alert(e2.message);
     }
-  });
-  document.querySelector("#winning-input-section button").addEventListener("click", () => {
+  };
+  const handleResult = (e) => {
     try {
+      e.preventDefault();
       const winningNumbers = getWinningNumbersInput().map(
         (number) => parseStringToNumber(number)
       );
@@ -265,23 +280,33 @@ loadComponent("main", `${BASE_URL}src/ui/html/main.html`).then(() => {
       const prizeList = getPrizeList(generatedLottos, winningLotto);
       const profitRate = getReturnRate(prizeList, purchaseAmount);
       renderStatistics(prizeList, profitRate);
-      modalContainer.style.display = "flex";
-    } catch (e) {
-      alert(e.message);
+      modalContainer.classList.add("visible-flex");
+    } catch (e2) {
+      alert(e2.message);
     }
-  });
-  modalContainer.addEventListener("click", (e) => {
+  };
+  const handleModalBackdrop = (e) => {
     if (e.target === modalContainer) {
-      modalContainer.style.display = "none";
+      modalContainer.classList.remove("visible-flex");
     }
-  });
-  modalCloseButton.addEventListener("click", () => {
-    modalContainer.style.display = "none";
-  });
-  document.querySelector("#modal-statistics-section button").addEventListener("click", () => {
+  };
+  const handleModalClose = () => {
+    modalContainer.classList.remove("visible-flex");
+  };
+  const handleReset = () => {
     resetGame();
     purchaseAmount = 0;
     generatedLottos = [];
-    modalContainer.style.display = "none";
-  });
+    modalContainer.classList.remove("visible-flex");
+  };
+  bindPurchaseEvent(handlePurchase);
+  bindResultEvent(handleResult);
+  bindModalBackdropClick(handleModalBackdrop);
+  bindModalCloseEvent(handleModalClose);
+  bindResetEvent(handleReset);
+};
+const BASE_URL = "/javascript-lotto/";
+loadComponent("main", `${BASE_URL}src/ui/html/main.html`).then(() => {
+  document.querySelector("#modal-close-button img").src = `${BASE_URL}close-button.svg`;
+  playLottoGameWeb();
 });
